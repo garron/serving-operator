@@ -17,21 +17,30 @@ type Owner interface {
 	schema.ObjectKind
 }
 
-// If an error occurs, no resources are transformed
-func (f *Manifest) Transform(fns ...Transformer) error {
+func transformResources(resources []unstructured.Unstructured, fns ...Transformer) ([]unstructured.Unstructured, error) {
 	var results []unstructured.Unstructured
-	for i := 0; i < len(f.Resources); i++ {
-		spec := f.Resources[i].DeepCopy()
+	for i := 0; i < len(resources); i++ {
+		spec := resources[i].DeepCopy()
 		for _, transform := range fns {
 			err := transform(spec)
 			if err != nil {
-				return err
+				return nil, err
 			}
 		}
 		results = append(results, *spec)
 	}
-	f.Resources = results
-	return nil
+	return results, nil
+}
+
+// If an error occurs, no resources are transformed
+func (f *Manifest) Transform(fns ...Transformer) (Manifestival, error) {
+	transformed, err := transformResources(f.Resources, fns...)
+	if err != nil {
+		return nil, err
+	}
+	fCopy := *f
+	fCopy.Resources = transformed
+	return &fCopy, nil
 }
 
 // We assume all resources in the manifest live in the same namespace
